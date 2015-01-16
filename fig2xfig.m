@@ -5,15 +5,18 @@ function fig2xfig(figfile, w,h)
   % cc - object with all graphical information
   cc.in2px = get(0, 'screenpixelsperinch'); % screen resoution
   cc.in2fig = 1200; % fig units
+  cc.in2pt  = 72;   % points
+  cc.in2cm  = 2.54; % cm
   cc.px2fig = cc.in2fig/cc.in2px; % pixels -> fig units
   cc.w = w;
   cc.h = h;
+  cc.fname = figfile;
 
   % set figure size:
   pos = get(hh, 'position');
   set(hh, 'position', [pos(1) pos(2) w h]);
 
-  % open fig file, wite header
+  % open fig file, write header
   cc.fd=fopen(figfile, 'w');
   fig_head(cc);
 
@@ -26,6 +29,8 @@ function cc=plot_obj(cc, hh)
 
   %%% plot only visible objects
   if isprop(hh, 'visible') && strcmp(get(hh, 'visible'), 'off'); return; end
+
+  %fprintf('> %s\n', get(hh, 'type'));
 
   %%% figure
   if strcmp(get(hh, 'type'), 'figure');
@@ -45,13 +50,16 @@ function cc=plot_obj(cc, hh)
 
   %%% axes
   if strcmp(get(hh, 'type'), 'axes');
+
     % coordinates
     apos=get(hh, 'position');
-    xlim=get(hh, 'xlim');
-    ylim=get(hh, 'ylim');
+    cc.xlim=get(hh, 'xlim');
+    cc.ylim=get(hh, 'ylim');
+    cc.clim=get(hh, 'clim');
+
     % conversion plot coordinates -> figure pixels
-    cc.xcnv=@(x) ((x-xlim(1))/(xlim(2)-xlim(1)) * apos(3)*cc.w + apos(1)*cc.w);
-    cc.ycnv=@(y) ((ylim(2)-y)/(ylim(2)-ylim(1)) * apos(4)*cc.h + (1-apos(4)-apos(2))*cc.h);
+    cc.xcnv=@(x) ((x-cc.xlim(1))/(cc.xlim(2)-cc.xlim(1)) * apos(3)*cc.w + apos(1)*cc.w);
+    cc.ycnv=@(y) ((cc.ylim(2)-y)/(cc.ylim(2)-cc.ylim(1)) * apos(4)*cc.h + (1-apos(4)-apos(2))*cc.h);
 
     % draw bounding box of the axes
     cc.depth=51;
@@ -74,13 +82,13 @@ function cc=plot_obj(cc, hh)
       cc.txt_valign=0;
       for i=1:length(xtick)
         x  = cc.xcnv(xtick(i));
-        y1 = cc.ycnv(ylim(1));
-        y2 = cc.ycnv(ylim(1))-tlen;
+        y1 = cc.ycnv(cc.ylim(1));
+        y2 = cc.ycnv(cc.ylim(1))-tlen;
         fig_line(cc, [x x], [y1 y2]);
-        y1 = cc.ycnv(ylim(2));
-        y2 = cc.ycnv(ylim(2))+tlen;
+        y1 = cc.ycnv(cc.ylim(2));
+        y2 = cc.ycnv(cc.ylim(2))+tlen;
         fig_line(cc, [x x], [y1 y2]);
-        y1 = cc.ycnv(ylim(1))+tlen;
+        y1 = cc.ycnv(cc.ylim(1))+tlen;
         if size(xlabl); fig_txt(cc, x,y1, xlabl(i,:)); end
       end
     end
@@ -88,13 +96,13 @@ function cc=plot_obj(cc, hh)
       cc.txt_align=2;
       for i=1:length(ytick)
         y  = cc.ycnv(ytick(i));
-        x1 = cc.xcnv(xlim(1));
-        x2 = cc.xcnv(xlim(1))+tlen;
+        x1 = cc.xcnv(cc.xlim(1));
+        x2 = cc.xcnv(cc.xlim(1))+tlen;
         fig_line(cc, [x1 x2], [y y]);
-        x1 = cc.xcnv(xlim(2));
-        x2 = cc.xcnv(xlim(2))-tlen;
+        x1 = cc.xcnv(cc.xlim(2));
+        x2 = cc.xcnv(cc.xlim(2))-tlen;
         fig_line(cc, [x1 x2], [y y]);
-        x1 = cc.xcnv(xlim(1))-tlen;
+        x1 = cc.xcnv(cc.xlim(1))-tlen;
         if size(ylabl); fig_txt(cc, x1,y, ylabl(i,:)); end
       end
     end
@@ -103,7 +111,7 @@ function cc=plot_obj(cc, hh)
     for i=1:length(ch);
       cc=plot_obj(cc, ch(i));
     end
-    return
+    return;
   end
 
   %%% hggroup
@@ -112,6 +120,37 @@ function cc=plot_obj(cc, hh)
     for i = 1:length(ch)
       cc=plot_obj(cc, ch(i));
     end
+    return;
+  end
+
+  %%% surface
+  if strcmp(get(hh, 'type'), 'surface');
+   c=get(hh, 'cdata');
+
+   if ~isfield(cc, 'maximg'); cc.maximg=1; end % first image number
+
+   fname = sprintf('%s_%03d.png', cc.fname,cc.maximg);
+   if length(size(c))==3;
+     imwrite(c, fname);
+   else
+     cmap=colormap;
+     m=length(cmap(:,1));
+     I = m*(c-cc.clim(1))/(cc.clim(2)-cc.clim(1));
+     imwrite(I(end:-1:1,:), cmap, fname);
+   end
+
+   % not xlim/ylim!
+   x = cc.xcnv(cc.xlim);
+   y = cc.ycnv(cc.ylim);
+   fprintf(cc.fd, '2 5 0 1 0 -1 500 -1 20 0.000 0 0 -1 0 0 5\n');
+   fprintf(cc.fd, '\t 0 %s\n', fname);
+   fprintf(cc.fd, '\t %d %d %d %d %d %d %d %d %d %d\n',...
+      round([x(1) y(2) x(1) y(1) x(2) y(1) x(2) y(2) x(1) y(2)]*cc.px2fig));
+   cc.maximg=cc.maximg+1;
+  end
+
+  %%% patch
+  if strcmp(get(hh, 'type'), 'patch');
   end
 
   %%% text
@@ -146,7 +185,7 @@ function cc=plot_obj(cc, hh)
     for i=1:length(x)
       fig_marker(cc, m, ms, cc.xcnv(x(i)), cc.ycnv(y(i)));
     end
-    return
+    return;
   end
 
 
@@ -200,7 +239,7 @@ end
 
 %%% plot a marker
 function fig_marker(cc, m, ms, x, y)
-  s = ms*cc.in2px/100; % why 100?
+  s = ms*cc.in2px/cc.in2pt;
   if m=='o'
     fprintf(cc.fd, '1 3 0 1 %d 0 %d -1 -1 0.000 1 0.0000 %d %d %d %d %d %d %d %d\n',...
       cc.color, cc.depth, round([x y s/2 s/2 x y x+s/2 y]*cc.px2fig));
@@ -252,11 +291,11 @@ function cc=set_fig_font(cc, ha)
     cc.font_size=get(ha,  'fontsize');
     if isprop(ha, 'fontunits')
       funits=get(ha, 'fontunits');
-      if strcmp(funits, 'cantimeters') cc.font_size = cc.font_size * 72/2.54; end
-      if strcmp(funits, 'inches')      cc.font_size = cc.font_size * 72; end
-      if strcmp(funits, 'pixels')      cc.font_size = cc.font_size /cc.in2px * 72; end
+      if strcmp(funits, 'cantimeters') cc.font_size = cc.font_size * cc.in2pt/cc.in2cm; end
+      if strcmp(funits, 'inches')      cc.font_size = cc.font_size * cc.in2pt; end
+      if strcmp(funits, 'pixels')      cc.font_size = cc.font_size /cc.in2px*cc.in2pt; end
     end
-    cc.font_size_px = cc.font_size * cc.in2px/72;
+    cc.font_size_px = cc.font_size * cc.in2px/cc.in2pt;
 
     cc.font=-1;
     if isprop(ha, 'fontname')
