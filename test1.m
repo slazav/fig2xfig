@@ -3,8 +3,8 @@ function f2m_test()
   xx=1:50:1000;
   ee=ones(size(xx))*0.1;
 
-  plot(xx, cos(xx/100), 'rs-');
-  errorbar(xx, sin(xx/100), ee , 'b.-');
+  plot(xx, cos(xx/100), 'rs--', 'linewidth', 2);
+  errorbar(xx, sin(xx/100), ee , 'b.-.');
 
   xlabel('xx')
   ylabel('yy')

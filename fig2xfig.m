@@ -11,25 +11,31 @@ function fig2xfig(figfile, w,h)
 
   % set figure size:
   pos = get(hh, 'position');
-  set(hh, 'position', [pos(1) pos(2) w+1 h+1]);
+  set(hh, 'position', [pos(1) pos(2) w h]);
 
-  % write fig header
+  % open fig file, wite header
   cc.fd=fopen(figfile, 'w');
   fig_head(cc);
 
+  % draw objects
   cc=plot_obj(cc, hh);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function cc=plot_obj(cc, hh)
+
+  %%% plot only visible objects
   if isprop(hh, 'visible') && strcmp(get(hh, 'visible'), 'off'); return; end
 
+  %%% figure
   if strcmp(get(hh, 'type'), 'figure');
-    % plot bounding box of the figure
+    % draw bounding box of the figure
     cc.depth=55;
     cc.color=0;
+    cc.width=1;
     fig_box(cc, 0,0,cc.w,cc.h);
 
+    % plot children
     ch = allchild(hh);
     for i = 1:length(ch)
       cc=plot_obj(cc, ch(i));
@@ -37,25 +43,27 @@ function cc=plot_obj(cc, hh)
   end
 
 
+  %%% axes
   if strcmp(get(hh, 'type'), 'axes');
     % coordinates
     apos=get(hh, 'position');
     xlim=get(hh, 'xlim');
     ylim=get(hh, 'ylim');
-    % conversion plot coordinate -> figure pixels
+    % conversion plot coordinates -> figure pixels
     cc.xcnv=@(x) ((x-xlim(1))/(xlim(2)-xlim(1)) * apos(3)*cc.w + apos(1)*cc.w);
     cc.ycnv=@(y) ((ylim(2)-y)/(ylim(2)-ylim(1)) * apos(4)*cc.h + (1-apos(4)-apos(2))*cc.h);
 
-    %  bounding box of the axes
+    % draw bounding box of the axes
     cc.depth=51;
     cc.color=0;
+    cc.width=1;
     fig_box(cc, apos(1)*cc.w, (1-apos(4)-apos(2))*cc.h, apos(3)*cc.w, apos(4)*cc.h);
 
+
+    % draw ticks and labels
     % tick length
     tlen=get(hh, 'ticklength');
     tlen = tlen(1) * max(apos(3)*cc.w, apos(4)*cc.h); % in px
-
-    % draw ticks and labels
     xtick=get(hh, 'xtick');
     ytick=get(hh, 'ytick');
     xlabl=get(hh, 'xticklabel');
@@ -98,6 +106,7 @@ function cc=plot_obj(cc, hh)
     return
   end
 
+  %%% hggroup
   if strcmp(get(hh, 'type'), 'hggroup');
     ch = allchild(hh);
     for i = 1:length(ch)
@@ -105,6 +114,7 @@ function cc=plot_obj(cc, hh)
     end
   end
 
+  %%% text
   if strcmp(get(hh, 'type'), 'text');
     cc.depth=30;
     cc = set_fig_font(cc,hh);
@@ -116,9 +126,11 @@ function cc=plot_obj(cc, hh)
     return;
   end
 
+  %%% line
   if strcmp(get(hh, 'type'), 'line');
     cc.depth=40;
     cc = set_fig_color(cc, get(hh, 'color'));
+    cc = set_fig_line(cc, hh);
     x=get(hh, 'xdata');
     y=get(hh, 'ydata');
     % cc = set_fig_line=get(hh, 'linestyle');
@@ -142,15 +154,21 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%%% print fig header
 function fig_head(cc)
   fprintf(cc.fd, '#FIG 3.2\nLandscape\nCenter\nMetric\nA4\n100.0\nSingle\n-2\n1200 2\n');
 end
+
+%%% plot a box
 function fig_box(cc, x,y,w,h)
   fprintf(cc.fd, '2 2 0 1 %d 7 %d -1 -1 0.000 0 0 -1 0 0 5\n',...
     cc.color, cc.depth);
   fprintf(cc.fd, '\t %d %d %d %d %d %d %d %d %d %d\n',...
     round([x y x+w y x+w y+h x y+h x y]*cc.px2fig));
 end
+
+
+%%% plot a line
 function fig_line(cc,x,y)
   N=length(x);
   if N==0; return; end
@@ -166,14 +184,21 @@ function fig_line(cc,x,y)
     return
   end
 
-  fprintf(cc.fd, '2 1 0 1 %d 7 %d -1 -1 0.000 2 0 -1 0 0 %d\n',...
-    cc.color, cc.depth, N);
+  if ~isfield(cc, 'line_style'); cc.line_style=0; end
+  if ~isfield(cc, 'width');      cc.width=1;  end
+  if ~isfield(cc, 'color');      cc.color=0;  end
+  if ~isfield(cc, 'depth');      cc.depth=50; end
+
+  fprintf(cc.fd, '2 1 %d %d %d 7 %d -1 -1 8.000 2 1 -1 0 0 %d\n',...
+    cc.line_style, cc.width, cc.color, cc.depth, N);
   for i=1:N
     fprintf(cc.fd, '\t %d %d\n',...
        round([x(i) y(i)]*cc.px2fig));
   end
 end
 
+
+%%% plot a marker
 function fig_marker(cc, m, ms, x, y)
   s = ms*cc.in2px/100; % why 100?
   if m=='o'
@@ -204,7 +229,25 @@ function fig_marker(cc, m, ms, x, y)
   end
 end
 
+%%% set line style and thicknes
+function cc=set_fig_line(cc, hh)
+  c.width=1;
+  if isprop(hh, 'linewidth');
+    w=get(hh, 'linewidth');
+    cc.width=round(w);
+  end
+  cc.line_style=0;
+  if isprop(hh, 'linestyle');
+    s=get(hh, 'linestyle');
+    if strcmp(s, '-');  cc.line_style=0;  end
+    if strcmp(s, '--'); cc.line_style=1;  end
+    if strcmp(s, ':');  cc.line_style=2;  end
+    if strcmp(s, '-.'); cc.line_style=3;  end
+    if strcmp(s, 'none'); cc.width=0;  end
+  end
+end
 
+%%% set fig font
 function cc=set_fig_font(cc, ha)
     cc.font_size=get(ha,  'fontsize');
     if isprop(ha, 'fontunits')
@@ -231,7 +274,6 @@ function cc=set_fig_font(cc, ha)
       fweight=get(ha,'fontweight');
       if strcmp(fweight, 'demi') || strcmp(fweight, 'bold') cc.font=cc.font+1; end
     end
-
     cc.txt_align=0;
     if isprop(ha, 'horizontalalignment');
       align=get(ha,  'horizontalalignment');
@@ -239,7 +281,6 @@ function cc=set_fig_font(cc, ha)
       if strcmp(align, 'center') cc.txt_align=1; end
       if strcmp(align, 'right')  cc.txt_align=2; end
     end
-
     cc.txt_valign=3;
     if isprop(ha, 'verticalalignment');
       align=get(ha,  'verticalalignment');
@@ -249,12 +290,13 @@ function cc=set_fig_font(cc, ha)
       if strcmp(align, 'baseline')  cc.txt_valign=3; end
       if strcmp(align, 'bottom')    cc.txt_valign=4; end
     end
-
     cc.txt_angle=0;
     if isprop(ha, 'rotation');
       cc.txt_angle = get(ha, 'rotation') * pi/180;
     end
 end
+
+%%% draw text
 function fig_txt(cc, x,y, txt)
   if length(txt)==0; return; end
   txt=txt(find(txt~=' ',1,'first'):find(txt~=' ',1,'last')); % crop spaces
