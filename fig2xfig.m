@@ -125,6 +125,8 @@ function cc=plot_obj(cc, hh)
 
   %%% surface
   if strcmp(get(hh, 'type'), 'surface');
+   x=get(hh, 'xdata');
+   y=get(hh, 'ydata');
    c=get(hh, 'cdata');
 
    if ~isfield(cc, 'maximg'); cc.maximg=1; end % first image number
@@ -140,8 +142,8 @@ function cc=plot_obj(cc, hh)
    end
 
    % not xlim/ylim!
-   x = cc.xcnv(cc.xlim);
-   y = cc.ycnv(cc.ylim);
+   x = cc.xcnv([x(1,1), x(1,end)]);
+   y = cc.ycnv([y(1,1), y(end,1)]);
    fprintf(cc.fd, '2 5 0 1 0 -1 500 -1 20 0.000 0 0 -1 0 0 5\n');
    fprintf(cc.fd, '\t 0 %s\n', fname);
    fprintf(cc.fd, '\t %d %d %d %d %d %d %d %d %d %d\n',...

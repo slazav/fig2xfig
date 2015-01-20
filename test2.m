@@ -8,9 +8,8 @@ function f2m_test()
   xlabel('xx')
   ylabel('yy')
   title('title')
-  legend('cos')
   fixaxes;
 
-  fig2xfig('test1.fig', 640, 480);
+  fig2xfig('test2.fig', 640, 480);
 
 end
