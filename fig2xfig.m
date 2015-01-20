@@ -78,8 +78,6 @@ function cc=plot_obj(cc, hh)
     ylabl=get(hh, 'yticklabel');
     cc = set_fig_font(cc,hh);
     if length(xtick)>1
-      cc.txt_align=1;
-      cc.txt_valign=0;
       for i=1:length(xtick)
         x  = cc.xcnv(xtick(i));
         y1 = cc.ycnv(cc.ylim(1));
@@ -88,12 +86,19 @@ function cc=plot_obj(cc, hh)
         y1 = cc.ycnv(cc.ylim(2));
         y2 = cc.ycnv(cc.ylim(2))+tlen;
         fig_line(cc, [x x], [y1 y2]);
-        y1 = cc.ycnv(cc.ylim(1))+tlen;
+        if strcmp(get(hh, 'xaxislocation'), 'bottom')
+          y1 = cc.ycnv(cc.ylim(1))+tlen;
+          cc.txt_valign=0;
+          cc.txt_align=1;
+        else
+          y1 = cc.ycnv(cc.ylim(2))-tlen;
+          cc.txt_valign=4;
+          cc.txt_align=1;
+        end
         if size(xlabl); fig_txt(cc, x,y1, xlabl(i,:)); end
       end
     end
     if length(ytick)>1
-      cc.txt_align=2;
       for i=1:length(ytick)
         y  = cc.ycnv(ytick(i));
         x1 = cc.xcnv(cc.xlim(1));
@@ -102,7 +107,15 @@ function cc=plot_obj(cc, hh)
         x1 = cc.xcnv(cc.xlim(2));
         x2 = cc.xcnv(cc.xlim(2))-tlen;
         fig_line(cc, [x1 x2], [y y]);
-        x1 = cc.xcnv(cc.xlim(1))-tlen;
+        if strcmp(get(hh, 'yaxislocation'), 'left')
+          x1 = cc.xcnv(cc.xlim(1))-tlen;
+          cc.txt_valign=3;
+          cc.txt_align=2;
+        else
+          x1 = cc.xcnv(cc.xlim(2))+tlen;
+          cc.txt_valign=2;
+          cc.txt_align=0;
+        end
         if size(ylabl); fig_txt(cc, x1,y, ylabl(i,:)); end
       end
     end
@@ -346,7 +359,7 @@ function fig_txt(cc, x,y, txt)
   if isfield(cc, 'txt_valign')
     sh=shifts(cc.txt_valign+1);
     y = y + sh*cc.font_size_px * cos(cc.txt_angle);
-    x = x - sh*cc.font_size_px * sin(cc.txt_angle);
+    x = x + sh*cc.font_size_px * sin(cc.txt_angle);
   end
   fprintf(cc.fd, '4 %d %d %d -1 %d %d %.4f 4 135 135 %d %d %s\\001\n',...
     cc.txt_align, cc.color, cc.depth, cc.font, cc.font_size, cc.txt_angle,...
