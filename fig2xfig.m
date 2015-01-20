@@ -124,7 +124,8 @@ function cc=plot_obj(cc, hh)
   end
 
   %%% surface
-  if strcmp(get(hh, 'type'), 'surface');
+  if strcmp(get(hh, 'type'), 'surface') ||...
+     strcmp(get(hh, 'type'), 'image');
    x=get(hh, 'xdata');
    y=get(hh, 'ydata');
    c=get(hh, 'cdata');
@@ -133,7 +134,7 @@ function cc=plot_obj(cc, hh)
 
    fname = sprintf('%s_%03d.png', cc.fname,cc.maximg);
    if length(size(c))==3;
-     imwrite(c, fname);
+     imwrite(c(end:-1:1,:,:), fname);
    else
      cmap=colormap;
      m=length(cmap(:,1));
@@ -142,8 +143,8 @@ function cc=plot_obj(cc, hh)
    end
 
    % not xlim/ylim!
-   x = cc.xcnv([x(1,1), x(1,end)]);
-   y = cc.ycnv([y(1,1), y(end,1)]);
+   x = cc.xcnv([x(1,1), x(end,end)]);
+   y = cc.ycnv([y(1,1), y(end,end)]);
    fprintf(cc.fd, '2 5 0 1 0 -1 500 -1 20 0.000 0 0 -1 0 0 5\n');
    fprintf(cc.fd, '\t 0 %s\n', fname);
    fprintf(cc.fd, '\t %d %d %d %d %d %d %d %d %d %d\n',...
@@ -151,7 +152,7 @@ function cc=plot_obj(cc, hh)
    cc.maximg=cc.maximg+1;
   end
 
-  %%% patch
+  %%% patch -- TODO
   if strcmp(get(hh, 'type'), 'patch');
   end
 
